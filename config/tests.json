@@ -1,0 +1,316 @@
+{
+  "labels": [
+    "via-router",
+    "direct-modem",
+    "after-bbr",
+    "night"
+  ],
+  "system": {
+    "public_ip_url": "https://ipinfo.io/json",
+    "first_hops_target": "8.8.8.8"
+  },
+  "ping": {
+    "count": 20,
+    "interval_seconds": 0.2,
+    "targets": [
+      {
+        "name": "Gateway",
+        "host": "@gateway"
+      },
+      {
+        "name": "Cloudflare DNS",
+        "host": "1.1.1.1"
+      },
+      {
+        "name": "Google DNS",
+        "host": "8.8.8.8"
+      },
+      {
+        "name": "fast.com",
+        "host": "fast.com"
+      }
+    ]
+  },
+  "route": {
+    "enabled": true,
+    "cycles": 15,
+    "targets": [
+      "8.8.8.8",
+      "speed.cloudflare.com",
+      "proof.ovh.net",
+      "nyc3.digitaloceanspaces.com"
+    ]
+  },
+  "services": {
+    "enabled": true,
+    "count": 5,
+    "interval_seconds": 0.3,
+    "timeout_seconds": 5,
+    "checks": [
+      {
+        "id": "dns",
+        "type": "dns",
+        "name": "DNS resolvers",
+        "servers": [
+          "@system",
+          "@gateway",
+          "1.1.1.1",
+          "8.8.8.8"
+        ],
+        "names": [
+          "google.com",
+          "netflix.com",
+          "digitalocean.com",
+          "github.com"
+        ],
+        "count": 3
+      },
+      {
+        "id": "do-nyc3",
+        "type": "https",
+        "name": "DigitalOcean NYC3 New York",
+        "host": "nyc3.digitaloceanspaces.com",
+        "category": "cloud"
+      },
+      {
+        "id": "do-tor1",
+        "type": "https",
+        "name": "DigitalOcean TOR1 Toronto",
+        "host": "tor1.digitaloceanspaces.com",
+        "category": "cloud"
+      },
+      {
+        "id": "do-sfo3",
+        "type": "https",
+        "name": "DigitalOcean SFO3 San Francisco",
+        "host": "sfo3.digitaloceanspaces.com",
+        "category": "cloud"
+      },
+      {
+        "id": "do-ams3",
+        "type": "https",
+        "name": "DigitalOcean AMS3 Amsterdam",
+        "host": "ams3.digitaloceanspaces.com",
+        "category": "cloud"
+      },
+      {
+        "id": "do-fra1",
+        "type": "https",
+        "name": "DigitalOcean FRA1 Frankfurt",
+        "host": "fra1.digitaloceanspaces.com",
+        "category": "cloud"
+      },
+      {
+        "id": "github-ssh",
+        "type": "ssh",
+        "name": "GitHub SSH (banner only)",
+        "host": "github.com",
+        "port": 22,
+        "category": "international"
+      },
+      {
+        "id": "google-https",
+        "type": "https",
+        "name": "Google HTTPS",
+        "host": "www.google.com",
+        "category": "international"
+      }
+    ]
+  },
+  "download": {
+    "enabled": true,
+    "duration_seconds": 10,
+    "warmup_seconds": 2,
+    "streams": [
+      1,
+      4
+    ],
+    "only": [],
+    "targets": [
+      {
+        "id": "fastcom-1",
+        "name": "fast.com server #1",
+        "type": "fastcom",
+        "server_index": 0,
+        "category": "auto"
+      },
+      {
+        "id": "fastcom-2",
+        "name": "fast.com server #2",
+        "type": "fastcom",
+        "server_index": 1,
+        "category": "auto"
+      },
+      {
+        "id": "ookla-local-1",
+        "name": "Ookla, same city #1",
+        "type": "ookla",
+        "search": "@city",
+        "index": 0,
+        "category": "local"
+      },
+      {
+        "id": "ookla-local-2",
+        "name": "Ookla, same city #2",
+        "type": "ookla",
+        "search": "@city",
+        "index": 1,
+        "category": "local"
+      },
+      {
+        "id": "cloudflare",
+        "name": "Cloudflare speed",
+        "type": "static",
+        "url": "https://speed.cloudflare.com/__down?bytes=25000000",
+        "category": "cdn"
+      },
+      {
+        "id": "google-dl",
+        "name": "Google dl.google.com",
+        "type": "static",
+        "url": "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb",
+        "category": "cdn"
+      },
+      {
+        "id": "linode-atlanta",
+        "name": "Linode Atlanta",
+        "type": "static",
+        "url": "https://speedtest.atlanta.linode.com/100MB-atlanta.bin",
+        "category": "international"
+      },
+      {
+        "id": "hetzner-ashburn",
+        "name": "Hetzner Ashburn",
+        "type": "static",
+        "url": "https://ash-speed.hetzner.com/100MB.bin",
+        "category": "international"
+      },
+      {
+        "id": "ovh-europe",
+        "name": "OVH Europe",
+        "type": "static",
+        "url": "https://proof.ovh.net/files/1Gb.dat",
+        "category": "international"
+      }
+    ]
+  },
+  "upload": {
+    "enabled": true,
+    "duration_seconds": 8,
+    "warmup_seconds": 2,
+    "streams": [
+      1,
+      4
+    ],
+    "only": [],
+    "targets": [
+      {
+        "id": "ookla-local-up",
+        "name": "Ookla, same city #1",
+        "type": "ookla",
+        "search": "@city",
+        "index": 0,
+        "category": "local"
+      },
+      {
+        "id": "cloudflare-up",
+        "name": "Cloudflare speed",
+        "type": "static",
+        "url": "https://speed.cloudflare.com/__up",
+        "category": "cdn"
+      }
+    ]
+  },
+  "loaded_latency": {
+    "enabled": true,
+    "duration_seconds": 10,
+    "streams": 4,
+    "ping_hosts": [
+      "@gateway",
+      "8.8.8.8"
+    ],
+    "download_target": "fastcom-1",
+    "upload_target": "ookla-local-up"
+  },
+  "analysis": {
+    "loss_warn_pct": 1,
+    "loss_crit_pct": 3,
+    "loss_min_lost_packets": 2,
+    "loaded_loss_warn_pct": 2,
+    "bloat_warn_ms": 30,
+    "bloat_crit_ms": 100,
+    "plan_ok_ratio": 0.8,
+    "plan_warn_ratio": 0.5,
+    "per_flow_ratio": 3,
+    "per_flow_single_max_mbps": 50,
+    "isp_cache_slow_ratio": 0.5,
+    "international_warn_ratio": 0.3,
+    "tcp_signal_pct": 1,
+    "route_loss_pct": 2,
+    "service_fail_pct": 1,
+    "dns_slow_ms": 100,
+    "handshake_extra_ms": 100
+  },
+  "profiles": {
+    "quick": {
+      "route": {
+        "enabled": false
+      },
+      "ping": {
+        "count": 20
+      },
+      "download": {
+        "duration_seconds": 6,
+        "only": [
+          "fastcom-1",
+          "ookla-local-1",
+          "cloudflare",
+          "ovh-europe"
+        ]
+      },
+      "upload": {
+        "duration_seconds": 6,
+        "streams": [
+          4
+        ],
+        "only": [
+          "ookla-local-up"
+        ]
+      },
+      "loaded_latency": {
+        "duration_seconds": 6
+      },
+      "services": {
+        "count": 3
+      }
+    },
+    "standard": {},
+    "full": {
+      "ping": {
+        "count": 40
+      },
+      "route": {
+        "cycles": 30
+      },
+      "download": {
+        "duration_seconds": 12,
+        "streams": [
+          1,
+          4,
+          8
+        ]
+      },
+      "upload": {
+        "duration_seconds": 10,
+        "streams": [
+          1,
+          4,
+          8
+        ]
+      },
+      "services": {
+        "count": 10
+      }
+    }
+  }
+}

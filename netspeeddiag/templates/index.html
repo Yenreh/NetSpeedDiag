@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NetSpeedDiag</title>
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+<link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='icon32.png') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='icon180.png') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,400&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  try { const t = localStorage.getItem('nsd-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<style>
+  /* Editorial "lab report" style: dark ink paper by default, cream paper in light mode. */
+  :root {
+    color-scheme: dark;
+    --bg: #15121a; --paper: #1c1823; --paper-2: #231e2b; --rule: #3d3548; --rule-soft: #2d2736;
+    --ink: #efe7da; --muted: #a59cae; --accent: #c4a8ff; --fill: #4a2391; --on-fill: #f3ecdf;
+    --ok: #9cc794; --info: #a59cae; --warn: #e6b45e; --crit: #f08a78;
+    --s1: #c4a8ff; --s2: #e6b45e; --s3: #9cc794; --grid: #2d2736;
+    --console-bg: #100d14; --console-ink: #d8cfe6;
+    --h: 36px;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f7f3ea; --paper: #fbf8f1; --paper-2: #f0e9dc; --rule: #cfc6b6; --rule-soft: #e2dacb;
+    --ink: #1c1917; --muted: #736b64; --accent: #5b21b6; --fill: #3f1d7a; --on-fill: #f7f3ea;
+    --ok: #3f7a3a; --info: #736b64; --warn: #9a5b06; --crit: #b3261e;
+    --s1: #5b21b6; --s2: #c27a12; --s3: #3f7a3a; --grid: #e6dfd1;
+    --console-bg: #1c1917; --console-ink: #efe7da;
+  }
+  * { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.5 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .mono, td.num, .card .v, pre.log, .chip { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+  main { max-width: 1240px; margin: 0 auto; padding: 0 16px 64px; }
+
+  /* Masthead */
+  .masthead { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 24px 0 14px;
+              border-bottom: 2px solid var(--ink); }
+  .masthead img { width: 44px; height: 44px; border-radius: 10px; flex: none; }
+  h1 { font-family: "Fraunces", Georgia, serif; font-size: 30px; font-weight: 700; margin: 0; line-height: 1.1; }
+  .dek { font-family: "Fraunces", Georgia, serif; font-style: italic; color: var(--muted); font-size: 14px; }
+  .meta { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .chip { border: 1px solid var(--rule); color: var(--muted); padding: 0 10px; font-size: 12px; line-height: 26px;
+          white-space: nowrap; background: transparent; }
+  button.chip { cursor: pointer; font-family: "IBM Plex Mono", monospace; font-weight: 500; height: 28px; }
+  button.chip:hover { border-color: var(--accent); color: var(--accent); }
+  .chip.live { border-color: var(--accent); color: var(--accent); }
+  .chip.live::before { content: ""; display: inline-block; width: 7px; height: 7px; background: var(--accent);
+                       margin-right: 7px; vertical-align: 0; animation: blink 1.2s infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+  .masthead + .subrule { border-bottom: 1px solid var(--rule); margin: 3px 0 24px; }
+
+  /* Panels and headings */
+  .panel { background: var(--paper); border: 1px solid var(--rule-soft); padding: 20px 22px 22px; margin-bottom: 22px; }
+  h2 { font-family: "Fraunces", Georgia, serif; font-size: 21px; font-weight: 600; margin: 0; line-height: 1.2; }
+  h2 small { font-family: "IBM Plex Sans", sans-serif; font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 8px; }
+  h3 { font-size: 11px; font-weight: 700; margin: 30px 0 12px; color: var(--muted); text-transform: uppercase;
+       letter-spacing: .12em; border-bottom: 1px solid var(--rule); padding-bottom: 6px; }
+  .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .muted { color: var(--muted); }
+  .notes { color: var(--muted); margin: 8px 0 0; }
+
+  /* Form controls */
+  .run-form { display: grid; grid-template-columns: 150px 200px minmax(200px, 1fr) auto; gap: 14px; align-items: end; }
+  label { display: flex; flex-direction: column; gap: 6px; font-size: 11px; font-weight: 600; color: var(--muted);
+          text-transform: uppercase; letter-spacing: .1em; min-width: 0; }
+  input, select { font: 400 14px "IBM Plex Sans", system-ui, sans-serif; color: var(--ink); background: var(--bg);
+                  border: 1px solid var(--rule); border-radius: 0; height: var(--h); padding: 0 10px; outline: none; width: 100%; }
+  input::placeholder { color: var(--muted); opacity: .7; }
+  input:focus, select:focus { border-color: var(--accent); }
+  input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--fill); cursor: pointer; margin: 0; }
+
+  /* Buttons and links */
+  button, .btn { font: 600 13px "IBM Plex Sans", system-ui, sans-serif; border: 1px solid var(--rule); background: transparent;
+                 color: var(--ink); border-radius: 0; height: var(--h); padding: 0 16px; cursor: pointer;
+                 display: inline-flex; align-items: center; gap: 6px; text-decoration: none; white-space: nowrap; }
+  button:hover, .btn:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+  button.primary { background: var(--fill); border-color: var(--fill); color: var(--on-fill); padding: 0 22px; }
+  button.primary:hover { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  button.sm, .btn.sm { height: 30px; padding: 0 12px; font-size: 12px; }
+  button.danger:hover { border-color: var(--crit); color: var(--crit); }
+  button:disabled { opacity: .4; cursor: default; border-color: var(--rule); color: var(--ink); }
+  .form-buttons { display: flex; gap: 8px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { font: 600 10.5px "IBM Plex Sans", system-ui, sans-serif; text-transform: uppercase; letter-spacing: .09em;
+       color: var(--muted); white-space: nowrap; border-bottom: 1px solid var(--ink); vertical-align: bottom; }
+  td { border-bottom: 1px dashed var(--rule-soft); }
+  th.num, td.num { text-align: right; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 13px; }
+  td.chk, th.chk { width: 28px; padding-right: 0; }
+  td .sub { display: block; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+  td .err { display: block; font-size: 12px; color: var(--crit); overflow-wrap: anywhere; }
+  #runs tr { cursor: pointer; }
+  tbody tr:hover td { background: var(--paper-2); }
+  tr.sel td { background: color-mix(in srgb, var(--fill) 28%, transparent) !important; }
+  .run-when { font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+  .run-label { font-weight: 600; margin-left: 8px; }
+
+  /* Badges, cards, findings */
+  .badge { display: inline-block; padding: 0 7px; border: 1px solid currentColor; font: 600 10.5px "IBM Plex Mono", monospace;
+           text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; line-height: 18px; }
+  .b-ok { color: var(--ok); } .b-info { color: var(--info); } .b-warn { color: var(--warn); } .b-crit { color: var(--crit); }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px 18px; }
+  .card { border-top: 3px solid var(--accent); padding: 8px 0 2px; min-width: 0; }
+  .card .k { font-size: 10.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+  .card .v { font-size: 21px; font-weight: 500; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card .s { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .finding { display: grid; grid-template-columns: 56px 1fr; gap: 12px; border-left: 3px solid var(--rule);
+             padding: 9px 14px; margin: 8px 0; background: var(--paper-2); }
+  .finding.crit { border-color: var(--crit); } .finding.warn { border-color: var(--warn); }
+  .finding.ok { border-color: var(--ok); } .finding.info { border-color: var(--info); }
+  .finding .badge { justify-self: start; align-self: start; margin-top: 2px; }
+  .finding .t { font-weight: 600; } .finding .d { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .alert { border-left: 3px solid var(--crit); background: var(--paper-2); color: var(--crit); padding: 9px 14px; margin-top: 14px; }
+
+  /* Progress */
+  .progress { height: 6px; background: var(--paper-2); overflow: hidden; margin: 18px 0 8px; }
+  .progress > div { height: 100%; background: var(--accent); width: 0; transition: width .4s; }
+  pre.log { max-height: 200px; overflow: auto; background: var(--console-bg); color: var(--console-ink);
+            padding: 10px 12px; font-size: 12px; margin: 0; white-space: pre-wrap; }
+
+  /* Charts */
+  .chart { margin: 4px 0 18px; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; }
+  svg { display: block; }
+  svg text { fill: var(--muted); font: 11px "IBM Plex Mono", ui-monospace, monospace; }
+  details summary { cursor: pointer; color: var(--accent); margin: 8px 0; font-weight: 600; }
+  .hidden { display: none !important; }
+  .delta-up { color: var(--ok); } .delta-down { color: var(--crit); }
+  .empty { color: var(--muted); padding: 18px 0; }
+
+  @media (max-width: 980px) {
+    .run-form { grid-template-columns: 1fr 1fr; }
+    .run-form .notes-field { grid-column: 1 / -1; }
+    .opt-md { display: none; }
+  }
+  @media (max-width: 640px) {
+    .run-form { grid-template-columns: 1fr; }
+    .opt-sm { display: none; }
+    .meta { margin-left: 0; }
+    h1 { font-size: 24px; }
+    .panel { padding: 16px; }
+    .finding { grid-template-columns: 1fr; gap: 4px; }
+    th, td { padding: 7px 6px; }
+    .run-label { display: block; margin-left: 0; }
+    .card .v { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header class="masthead">
+    <img src="{{ url_for('static', filename='icon128.png') }}" alt="">
+    <div>
+      <h1>NetSpeedDiag</h1>
+      <div class="dek">Line diagnostics: latency, loss, routes and per-connection throughput</div>
+    </div>
+    <div class="meta">
+      <span class="chip" id="live">Idle</span>
+      <span class="chip" id="plan">Plan</span>
+      <span class="chip">v{{ version }}</span>
+      <button class="chip" id="theme-btn" onclick="toggleTheme()">Light</button>
+    </div>
+  </header>
+  <div class="subrule"></div>
+
+  <section class="panel">
+    <div class="panel-head"><h2>New run</h2></div>
+    <div class="run-form">
+      <label>Profile <select id="profile"></select></label>
+      <label>Label <input id="label" list="labels" placeholder="via-router" maxlength="60"></label>
+      <datalist id="labels"></datalist>
+      <label class="notes-field">Notes <input id="notes" placeholder="Optional context: time, what changed..." maxlength="2000"></label>
+      <div class="form-buttons">
+        <button class="primary" id="start-btn" onclick="startRun()">Start</button>
+        <button id="cancel-btn" onclick="cancelRun()" disabled>Cancel</button>
+      </div>
+    </div>
+    <div id="progress-box" class="hidden">
+      <div class="progress"><div id="progress-bar"></div></div>
+      <div class="muted" id="progress-msg"></div>
+      <details open><summary>Log</summary><pre class="log" id="progress-log"></pre></details>
+    </div>
+    <div id="error" class="alert hidden"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Runs</h2>
+      <div class="actions">
+        <button class="sm" id="compare-btn" onclick="compareSelected()" disabled>Compare (0/2)</button>
+        <a class="btn sm" href="/api/runs.csv">Export CSV</a>
+      </div>
+    </div>
+    <div id="trend" class="chart"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th class="chk"></th><th>Run</th>
+          <th class="num">Down</th><th class="num">1 conn</th><th class="num opt-sm">ISP cache</th>
+          <th class="num opt-md">Local</th><th class="num opt-md">Intl</th><th class="num">Up</th>
+          <th class="num opt-sm">Loss</th><th class="num opt-md">Load</th><th class="num opt-md">Cloud</th><th class="opt-sm">Findings</th>
+        </tr></thead>
+        <tbody id="runs"><tr><td colspan="12" class="empty">Loading...</td></tr></tbody>
+      </table>
+    </div>
+    <p class="muted" style="font-size: 12px; margin: 10px 0 0;">Mbps, best steady rate. Loss: idle ping loss %. Load: latency increase under download load, ms. Cloud: best TCP handshake to a cloud endpoint, ms. Click a run for details.</p>
+  </section>
+
+  <section class="panel hidden" id="detail"></section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = (v, d = 1, suf = '') => v == null ? '<span class="muted">-</span>' : (typeof v === 'number' ? v.toFixed(d) : esc(v)) + suf;
+const badge = (sev, text) => `<span class="badge b-${sev}">${esc(text || sev)}</span>`;
+const runTime = id => id ? `${id.slice(0,4)}-${id.slice(4,6)}-${id.slice(6,8)} ${id.slice(9,11)}:${id.slice(11,13)}` : '';
+let RUNS = [], polling = null, lastRunning = false, VIEW = null;
+
+/* ---------- theme ---------- */
+function currentTheme() { return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'; }
+function toggleTheme() {
+  const next = currentTheme() === 'light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('nsd-theme', next); } catch (e) {}
+  $('theme-btn').textContent = next === 'light' ? 'Dark' : 'Light';
+}
+
+/* ---------- API ---------- */
+async function api(path, opts) {
+  const resp = await fetch(path, opts);
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
+  return data;
+}
+function showError(msg) { const e = $('error'); e.textContent = msg; e.classList.toggle('hidden', !msg); }
+
+async function loadConfig() {
+  const cfg = await api('/api/config');
+  $('labels').innerHTML = (cfg.labels || []).map(l => `<option value="${esc(l)}">`).join('');
+  $('profile').innerHTML = cfg.profiles.map(p => `<option ${p === cfg.default_profile ? 'selected' : ''}>${esc(p)}</option>`).join('');
+  const p = cfg.plan, set = p.download_mbps || p.upload_mbps;
+  $('plan').textContent = set ? `Plan ${p.download_mbps}/${p.upload_mbps} Mbps` : 'Plan not set';
+  $('plan').title = set ? 'Contracted download / upload' : 'Set NSD_PLAN_DOWNLOAD_MBPS / NSD_PLAN_UPLOAD_MBPS in .env';
+}
+
+/* ---------- runs ---------- */
+async function startRun() {
+  showError('');
+  try {
+    await api('/api/runs', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({profile: $('profile').value, label: $('label').value, notes: $('notes').value})});
+    pollProgress();
+  } catch (e) { showError(e.message); }
+}
+async function cancelRun() { await api('/api/cancel', {method: 'POST'}); }
+
+async function pollProgress() {
+  clearTimeout(polling);
+  let p;
+  try { p = await api('/api/progress'); } catch (e) { polling = setTimeout(pollProgress, 3000); return; }
+  if (p.id) {
+    $('progress-box').classList.remove('hidden');
+    $('progress-bar').style.width = (p.total ? Math.round(100 * (p.step - (p.running ? 0.5 : 0)) / p.total) : 0) + '%';
+    $('progress-msg').textContent = `${p.running ? 'Running' : 'Finished'} ${runTime(p.id)} (${p.profile}${p.label ? ', ' + p.label : ''}), step ${p.step}/${p.total}: ${p.message || ''}`;
+    const log = $('progress-log'); log.textContent = (p.log || []).join('\n'); log.scrollTop = log.scrollHeight;
+  }
+  $('live').classList.toggle('live', !!p.running);
+  $('live').textContent = p.running ? `Running ${p.step}/${p.total}` : 'Idle';
+  $('start-btn').disabled = !!p.running; $('cancel-btn').disabled = !p.running;
+  if (lastRunning && !p.running) { await loadRuns(); if (p.id) showRun(p.id); }
+  if (p.running && !lastRunning) loadRuns();
+  lastRunning = !!p.running;
+  if (p.running) polling = setTimeout(pollProgress, 1500);
+}
+
+function selectedIds() { return [...document.querySelectorAll('.cmp:checked')].map(c => c.value); }
+function updateCompare() {
+  const n = selectedIds().length;
+  $('compare-btn').textContent = `Compare (${n}/2)`;
+  $('compare-btn').disabled = n !== 2;
+}
+
+async function loadRuns() {
+  RUNS = await api('/api/runs');
+  $('runs').innerHTML = RUNS.length ? RUNS.map(r => {
+    const s = r.summary || {}, f = s.findings || {};
+    const st = {completed: '', running: badge('info', 'running'), cancelled: badge('warn', 'cancelled'), failed: badge('crit', 'failed')}[r.status] ?? '';
+    return `<tr id="row-${r.id}" onclick="showRun('${r.id}')">
+      <td class="chk" onclick="event.stopPropagation()"><input type="checkbox" class="cmp" value="${r.id}" onchange="updateCompare()"></td>
+      <td><span class="run-when">${runTime(r.id)}</span>${r.label ? `<span class="run-label">${esc(r.label)}</span>` : ''}
+        <span class="sub">${esc(r.profile)} ${st}</span></td>
+      <td class="num">${fmt(s.best_download_mbps)}</td><td class="num">${fmt(s.best_single_stream_download_mbps)}</td>
+      <td class="num opt-sm">${fmt(s.isp_cache_mbps)}</td><td class="num opt-md">${fmt(s.local_mbps)}</td>
+      <td class="num opt-md">${fmt(s.international_mbps)}</td><td class="num">${fmt(s.best_upload_mbps)}</td>
+      <td class="num opt-sm">${fmt(s.idle_loss_pct, 1, '%')}</td><td class="num opt-md">${fmt(s.loaded_download_bloat_ms, 0)}</td>
+      <td class="num opt-md">${fmt(s.cloud_connect_ms, 0)}</td>
+      <td class="opt-sm"><div class="badges">${f.crit ? badge('crit', f.crit + ' crit') : ''}${f.warn ? badge('warn', f.warn + ' warn') : ''}${!f.crit && !f.warn ? badge('ok', 'clean') : ''}</div></td></tr>`;
+  }).join('') : '<tr><td colspan="12" class="empty">No runs yet. Start one above.</td></tr>';
+  updateCompare();
+  renderTrend();
+  markSelected();
+}
+
+function markSelected() {
+  const id = VIEW && VIEW.kind === 'run' ? VIEW.doc.id : null;
+  document.querySelectorAll('#runs tr').forEach(tr => tr.classList.toggle('sel', tr.id === 'row-' + id));
+}
+
+async function deleteRun(id) {
+  if (!window.confirm(`Delete run ${runTime(id)}?`)) return;
+  try {
+    await api('/api/runs/' + id, {method: 'DELETE'});
+    VIEW = null; $('detail').classList.add('hidden');
+    await loadRuns();
+  } catch (e) { showError(e.message); }
+}
+
+/* ---------- charts (inline SVG, drawn at the container's pixel width) ---------- */
+function chartWidth() { return Math.max(300, document.querySelector('.panel').clientWidth - 46); }
+function niceMax(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p; return 10 * p; }
+
+function lineChart(series, labels, unit) {
+  const W = chartWidth(), H = 170, L = 40, R = 12, T = 8, B = 22;
+  const all = series.flatMap(s => s.values).filter(v => v != null);
+  if (!all.length) return '';
+  const max = niceMax(Math.max(...all)), n = Math.max(labels.length, 2);
+  const x = i => L + (W - L - R) * (labels.length === 1 ? 0.5 : i / (n - 1));
+  const y = v => T + (H - T - B) * (1 - v / max);
+  let g = '';
+  for (let k = 0; k <= 4; k++) {
+    const v = max * k / 4;
+    g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${Math.round(v)}</text>`;
+  }
+  const step = Math.ceil(labels.length / Math.max(2, Math.floor(W / 140)));
+  labels.forEach((l, i) => {
+    if (i % step !== 0 && i !== labels.length - 1) return;
+    const anchor = labels.length > 1 && i === 0 ? 'start' : labels.length > 1 && i === labels.length - 1 ? 'end' : 'middle';
+    g += `<text x="${x(i)}" y="${H - 5}" text-anchor="${anchor}">${esc(l)}</text>`;
+  });
+  series.forEach(s => {
+    const pts = s.values.map((v, i) => v == null ? null : `${x(i)},${y(v)}`).filter(Boolean);
+    if (pts.length > 1) g += `<polyline fill="none" stroke="${s.color}" stroke-width="2" points="${pts.join(' ')}"/>`;
+    s.values.forEach((v, i) => { if (v != null) g += `<circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="${s.color}"><title>${esc(s.name)}, ${esc(labels[i])}: ${v.toFixed(1)} Mbps</title></circle>`; });
+  });
+  const legend = `<div class="legend">${series.map(s => `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join('')}<span>${esc(unit)}</span></div>`;
+  return legend + `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`;
+}
+
+function renderTrend() {
+  const runs = RUNS.filter(r => r.status === 'completed').slice().reverse().slice(-30);
+  if (runs.length < 2) { $('trend').innerHTML = ''; return; }
+  const pick = k => runs.map(r => (r.summary || {})[k] ?? null);
+  $('trend').innerHTML = lineChart([
+    {name: 'Best download', color: 'var(--s1)', values: pick('best_download_mbps')},
+    {name: 'Single connection', color: 'var(--s2)', values: pick('best_single_stream_download_mbps')},
+    {name: 'ISP cache (fast.com #1)', color: 'var(--s3)', values: pick('isp_cache_mbps')},
+  ], runs.map(r => r.label || runTime(r.id).slice(5)), 'Mbps per completed run');
+}
+
+function barChart(tests) {
+  const byTarget = {};
+  tests.filter(t => t.result).forEach(t => { (byTarget[t.target.id] ||= {name: t.target.name, v: {}}).v[t.streams] = t.result.steady_mbps; });
+  const rows = Object.values(byTarget);
+  if (!rows.length) return '';
+  const streams = [...new Set(tests.filter(t => t.result).map(t => t.streams))].sort((a, b) => a - b);
+  const colors = ['var(--s2)', 'var(--s1)', 'var(--s3)'];
+  const W = chartWidth(), L = Math.min(190, Math.round(W * 0.34)), R = 56, bh = 10, gap = 10;
+  const max = niceMax(Math.max(...rows.flatMap(r => Object.values(r.v)))), plotW = W - L - R;
+  const rowH = streams.length * (bh + 3) + gap, H = rows.length * rowH + 20, maxChars = Math.floor((L - 10) / 6.7);
+  let g = '';
+  for (let k = 0; k <= 4; k++) {
+    const x = L + plotW * k / 4;
+    g += `<line x1="${x}" x2="${x}" y1="0" y2="${H - 18}" stroke="var(--grid)"/><text x="${x}" y="${H - 4}" text-anchor="middle">${Math.round(max * k / 4)}</text>`;
+  }
+  rows.forEach((r, i) => {
+    const y0 = i * rowH, name = r.name.length > maxChars ? r.name.slice(0, maxChars - 1) + '.' : r.name;
+    g += `<text x="${L - 10}" y="${y0 + (rowH - gap) / 2 + 4}" text-anchor="end"><title>${esc(r.name)}</title>${esc(name)}</text>`;
+    streams.forEach((s, j) => {
+      const v = r.v[s]; if (v == null) return;
+      const w = Math.max(1, plotW * v / max), y = y0 + j * (bh + 3);
+      g += `<rect x="${L}" y="${y}" width="${w}" height="${bh}" fill="${colors[j % 3]}"><title>${esc(r.name)}, ${s} connection(s): ${v.toFixed(1)} Mbps</title></rect><text x="${L + w + 5}" y="${y + bh - 1}">${v.toFixed(1)}</text>`;
+    });
+  });
+  return `<div class="chart"><div class="legend">${streams.map((s, j) => `<span><i style="background:${colors[j % 3]}"></i>${s} connection${s > 1 ? 's' : ''}</span>`).join('')}<span>steady Mbps</span></div><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${g}</svg></div>`;
+}
+
+function sparkline(values) {
+  if (!values || values.length < 2) return '';
+  const W = 96, H = 22, max = Math.max(...values, 1);
+  const pts = values.map((v, i) => `${(W * i / (values.length - 1)).toFixed(1)},${(H - 2 - (H - 4) * v / max).toFixed(1)}`).join(' ');
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="var(--s1)" stroke-width="1.5" points="${pts}"/></svg>`;
+}
+
+/* ---------- run detail ---------- */
+function card(k, v, s) { return `<div class="card"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s || ''}</div></div>`; }
+function findingHtml(f, withDetail = true) {
+  return `<div class="finding ${f.severity}">${badge(f.severity)}<div><div class="t">${esc(f.title)}</div>${withDetail ? `<div class="d">${esc(f.detail)}</div>` : ''}</div></div>`;
+}
+
+function throughputTable(tests) {
+  if (!tests || !tests.length) return '<p class="empty">Not measured in this profile.</p>';
+  return `<div class="table-wrap"><table><thead><tr><th>Target</th><th class="num">Conn</th><th class="num">Steady</th>
+    <th class="num opt-sm">Peak</th><th class="num opt-md">Per connection</th><th class="num opt-md">TTFB ms</th>
+    <th class="num opt-sm" title="Out-of-order (download) / retransmitted (upload) packets">OOO / retx</th><th class="opt-sm">Timeline</th></tr></thead><tbody>${tests.map(t => {
+      const r = t.result, tg = t.target;
+      const where = [tg.category, tg.detail || tg.host].filter(Boolean).map(esc).join(' &middot; ');
+      if (!r) return `<tr><td>${esc(tg.name)}<span class="sub">${where}</span><span class="err">${esc(t.error)}</span></td><td class="num">${t.streams ?? '-'}</td><td colspan="6"></td></tr>`;
+      const errs = Object.entries(r.errors || {}).map(([k, v]) => `${k} x${v}`).join(', ');
+      return `<tr><td>${esc(tg.name)}<span class="sub">${where}</span>${errs ? `<span class="err">${esc(errs)}</span>` : ''}</td>
+        <td class="num">${t.streams}</td><td class="num"><b>${fmt(r.steady_mbps)}</b></td><td class="num opt-sm">${fmt(r.peak_mbps)}</td>
+        <td class="num opt-md">${(r.per_stream_mbps || []).map(v => v.toFixed(0)).join(' / ')}</td>
+        <td class="num opt-md">${fmt(r.ttfb_ms, 0)}</td><td class="num opt-sm">${fmt((r.tcp || {}).loss_indicator_pct, 1, '%')}</td>
+        <td class="opt-sm">${sparkline(r.series)}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+
+function pingTable(rows, idle) {
+  if (!rows || !rows.length) return '<p class="empty">Not measured.</p>';
+  return `<div class="table-wrap"><table><thead><tr><th>Target</th><th class="num">Sent</th><th class="num">Loss</th>
+    <th class="num opt-sm">Min</th><th class="num">Avg</th><th class="num opt-sm">P95</th><th class="num opt-md">Max</th><th class="num opt-md">Jitter</th>${idle ? '<th class="num">vs idle</th>' : ''}</tr></thead>
+    <tbody>${rows.map(p => {
+      const base = idle ? idle.find(i => i.host === p.host) : null;
+      const d = base && p.avg != null && base.avg != null ? p.avg - base.avg : null;
+      return `<tr><td>${esc(p.name || p.host)}${p.name && p.name !== p.host ? `<span class="sub">${esc(p.host)}</span>` : ''}${p.error ? `<span class="err">${esc(p.error)}</span>` : ''}</td>
+      <td class="num">${p.sent ?? '-'}</td>
+      <td class="num">${p.loss_pct > 0 ? badge(p.loss_pct >= 2 ? 'crit' : 'warn', p.loss_pct + '%') : fmt(p.loss_pct, 1, '%')}</td>
+      <td class="num opt-sm">${fmt(p.min)}</td><td class="num">${fmt(p.avg)}</td><td class="num opt-sm">${fmt(p.p95)}</td>
+      <td class="num opt-md">${fmt(p.max)}</td><td class="num opt-md">${fmt(p.jitter)}</td>
+      ${idle ? `<td class="num">${d == null ? '-' : (d >= 0 ? '+' : '') + d.toFixed(1)}</td>` : ''}</tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+
+function routeTables(routes) {
+  if (!routes || !routes.length) return '<p class="empty">Route tracing disabled in this profile.</p>';
+  return routes.map(r => `<details><summary>${esc(r.target)}: ${(r.hops || []).length} hops${r.error ? ' (' + esc(r.error) + ')' : ''}</summary>
+    <div class="table-wrap"><table><thead><tr><th class="num">Hop</th><th>Host</th><th class="opt-sm">ASN</th><th class="num">Loss</th><th class="num">Avg</th>
+    <th class="num opt-sm">Best</th><th class="num opt-sm">Worst</th><th class="num opt-md">StDev</th></tr></thead><tbody>${(r.hops || []).map(h => `<tr>
+    <td class="num">${h.hop}</td><td style="word-break: break-all">${esc(h.host)}</td><td class="opt-sm">${esc(h.asn)}</td>
+    <td class="num">${h.loss_pct > 0 ? badge(h.loss_pct >= 5 ? 'warn' : 'info', h.loss_pct.toFixed(1) + '%') : '0%'}</td>
+    <td class="num">${fmt(h.avg)}</td><td class="num opt-sm">${fmt(h.best)}</td><td class="num opt-sm">${fmt(h.worst)}</td><td class="num opt-md">${fmt(h.stdev)}</td></tr>`).join('')}
+    </tbody></table></div></details>`).join('');
+}
+
+function loadedSection(ll, idle) {
+  let html = '';
+  for (const dir of ['download', 'upload']) {
+    const b = (ll || {})[dir];
+    if (!b) continue;
+    if (b.error) { html += `<p>${badge('crit', 'error')} ${dir}: ${esc(b.error)}</p>`; continue; }
+    const t = b.throughput || {};
+    html += `<p class="muted">While saturating the ${dir} with ${esc(b.target.name)} (${fmt(t.steady_mbps)} Mbps)</p>` + pingTable(b.pings, idle);
+  }
+  return html || '<p class="empty">Not measured.</p>';
+}
+
+function servicesSection(services) {
+  if (!services || !services.length) return '<p class="empty">No service checks in this run (see the services section of the catalog).</p>';
+  const checks = services.filter(s => s.type !== 'dns'), dns = services.filter(s => s.type === 'dns');
+  const failCell = s => s.fail_pct > 0 ? badge(s.fail_pct >= 20 ? 'crit' : 'warn', s.fail_pct + '%') : fmt(s.fail_pct, 0, '%');
+  let html = '';
+  if (checks.length) {
+    html += `<div class="table-wrap"><table><thead><tr><th>Check</th><th class="num">OK</th><th class="num">Failed</th>
+      <th class="num">Connect</th><th class="num opt-sm">P95</th><th class="num opt-sm">Handshake</th><th class="num opt-md">TTFB</th><th class="opt-md">Result</th></tr></thead><tbody>
+      ${checks.map(s => {
+        const sub = [s.type.toUpperCase(), s.category, s.target].filter(Boolean).map(esc).join(' &middot; ');
+        if (s.error) return `<tr><td>${esc(s.name)}<span class="sub">${sub}</span><span class="err">${esc(s.error)}</span></td><td colspan="7"></td></tr>`;
+        const hs = s.tls_ms ? fmt(s.tls_ms.avg, 0) + ' <span class="muted">tls</span>' : s.banner_ms ? fmt(s.banner_ms.avg, 0) + ' <span class="muted">ssh</span>' : fmt(null);
+        const se = s.session || {};
+        const extra = se.error ? `<span class="err">login: ${esc(se.error)}</span>`
+          : se.download_mbps != null ? `login ${fmt(se.auth_ms, 0)} ms<span class="sub">${fmt(se.download_mbps)} down / ${fmt(se.upload_mbps)} up Mbps</span>`
+          : se.auth_ms != null ? `login ${fmt(se.auth_ms, 0)} ms` : `<span class="muted">${esc(s.info || '')}</span>`;
+        const errs = Object.entries(s.errors || {}).map(([k, v]) => `${k} x${v}`).join(', ');
+        return `<tr><td>${esc(s.name)}<span class="sub">${sub}</span>${errs ? `<span class="err">${esc(errs)}</span>` : ''}</td>
+          <td class="num">${s.ok}/${s.attempts}</td><td class="num">${failCell(s)}</td>
+          <td class="num">${fmt((s.connect_ms || {}).avg, 0)}</td><td class="num opt-sm">${fmt((s.connect_ms || {}).p95, 0)}</td>
+          <td class="num opt-sm">${hs}</td><td class="num opt-md">${fmt((s.ttfb_ms || {}).avg, 0)}</td><td class="opt-md" style="font-size: 12px">${extra}</td></tr>`;
+      }).join('')}</tbody></table></div>
+      <p class="muted" style="font-size: 12px; margin: 6px 0 0;">Times in ms (average). Connect: TCP handshake, about one round trip.</p>`;
+  }
+  for (const d of dns) {
+    if (d.error) { html += `<p><span class="err">${esc(d.name)}: ${esc(d.error)}</span></p>`; continue; }
+    html += `<p class="muted" style="margin: 18px 0 6px;">DNS: ${esc(d.target)}</p><div class="table-wrap"><table><thead><tr><th>Resolver</th><th class="num">OK</th><th class="num">Failed</th>
+      <th class="num">Avg</th><th class="num opt-sm">Min</th><th class="num opt-sm">P95</th><th class="num opt-md">Max</th></tr></thead><tbody>
+      ${(d.resolvers || []).map(r => `<tr><td>${esc(r.name)}${Object.keys(r.errors || {}).length ? `<span class="err">${esc(Object.entries(r.errors).map(([k, v]) => k + ' x' + v).join(', '))}</span>` : ''}</td>
+        <td class="num">${r.ok}/${r.attempts}</td><td class="num">${failCell(r)}</td><td class="num">${fmt((r.query_ms || {}).avg, 0)}</td>
+        <td class="num opt-sm">${fmt((r.query_ms || {}).min, 0)}</td><td class="num opt-sm">${fmt((r.query_ms || {}).p95, 0)}</td><td class="num opt-md">${fmt((r.query_ms || {}).max, 0)}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  }
+  return html;
+}
+
+async function showRun(id) {
+  const doc = await api('/api/runs/' + id);
+  VIEW = {kind: 'run', doc};
+  renderRun(doc);
+  markSelected();
+  $('detail').scrollIntoView({behavior: 'smooth'});
+}
+
+function renderRun(d) {
+  const s = d.summary || {}, sys = d.system || {}, iface = sys.interface || {}, pub = sys.public || {};
+  const hops = (sys.first_hops || []).map(h => `${esc(h.host)}${h.private ? ' (private)' : ''}`).join(' &rarr; ');
+  $('detail').classList.remove('hidden');
+  $('detail').innerHTML = `
+    <div class="panel-head">
+      <h2>${runTime(d.id)}${d.label ? ', ' + esc(d.label) : ''}<small>${esc(d.profile)} profile, ${esc(d.status)}, ${d.duration_s ?? '?'} s</small></h2>
+      <div class="actions">
+        <a class="btn sm" href="/api/runs/${d.id}/download">Download JSON</a>
+        <button class="sm danger" onclick="deleteRun('${d.id}')">Delete</button>
+      </div>
+    </div>
+    ${d.notes ? `<p class="notes">${esc(d.notes)}</p>` : ''}${d.error ? `<div class="alert">${esc(d.error)}</div>` : ''}
+    <h3>Headline</h3>
+    <div class="cards">
+      ${card('Best download', fmt(s.best_download_mbps, 1, ' Mbps'), 'any target, any connections')}
+      ${card('Single connection', fmt(s.best_single_stream_download_mbps, 1, ' Mbps'), 'best 1-connection download')}
+      ${card('ISP cache', fmt(s.isp_cache_mbps, 1, ' Mbps'), 'fast.com server inside the ISP')}
+      ${card('International', fmt(s.international_mbps, 1, ' Mbps'), 'best server abroad')}
+      ${card('Upload', fmt(s.best_upload_mbps, 1, ' Mbps'), 'best')}
+      ${card('Latency', fmt(s.idle_latency_ms, 1, ' ms'), `loss ${fmt(s.idle_loss_pct, 1, '%')}, +${fmt(s.loaded_download_bloat_ms, 0, ' ms')} under load`)}
+    </div>
+    <h3>Findings</h3>
+    ${(d.findings || []).map(f => findingHtml(f)).join('') || '<p class="empty">None.</p>'}
+    <h3>Connection</h3>
+    <div class="cards">
+      ${card('Public IP', esc(pub.ip || '-'), esc(pub.org || pub.error || ''))}
+      ${card('Interface', esc(iface.name || '-'), `${iface.wireless ? 'Wi-Fi' : 'wired'}, ${iface.speed_mbps ?? '?'} Mbps ${esc(iface.duplex || '')}`)}
+      ${card('Gateway', esc((sys.route || {}).gateway || '-'), 'DNS ' + esc((sys.dns || []).join(', ')))}
+      ${card('TCP', esc((sys.tcp || {}).congestion_control || '-'), 'qdisc ' + esc((sys.tcp || {}).default_qdisc || '-'))}
+    </div>
+    <p class="notes" style="font-size: 13px;">First hops: ${hops || '-'}</p>
+    <h3>Download</h3>${barChart(d.download || [])}${throughputTable(d.download)}
+    <h3>Upload</h3>${barChart(d.upload || [])}${throughputTable(d.upload)}
+    <h3>Services</h3>${servicesSection(d.services)}
+    <h3>Idle latency</h3>${pingTable(d.ping)}
+    <h3>Latency under load</h3>${loadedSection(d.loaded_latency, d.ping)}
+    <h3>Routes</h3>${routeTables(d.route)}
+    <details><summary>Raw system context</summary><pre class="log">${esc(JSON.stringify(d.system, null, 2))}</pre></details>`;
+}
+
+/* ---------- compare ---------- */
+function deltaCell(a, b) {
+  if (a == null || b == null) return '<td class="num">-</td>';
+  const pct = a ? (b - a) / a * 100 : 0;
+  return `<td class="num ${pct > 10 ? 'delta-up' : pct < -10 ? 'delta-down' : ''}">${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%</td>`;
+}
+
+async function compareSelected() {
+  const ids = selectedIds();
+  if (ids.length !== 2) return;
+  showError('');
+  const [b, a] = await Promise.all(ids.map(id => api('/api/runs/' + id)));   // list is newest first: a = older
+  VIEW = {kind: 'compare', a, b};
+  renderCompare(a, b);
+  markSelected();
+  $('detail').scrollIntoView({behavior: 'smooth'});
+}
+
+function renderCompare(a, b) {
+  const name = r => `${runTime(r.id)}${r.label ? ', ' + esc(r.label) : ''}`;
+  const metrics = [
+    ['Best download', 'best_download_mbps'], ['Single connection', 'best_single_stream_download_mbps'],
+    ['ISP cache', 'isp_cache_mbps'], ['Local', 'local_mbps'], ['National', 'national_mbps'],
+    ['International', 'international_mbps'], ['Upload', 'best_upload_mbps'], ['Idle latency (ms)', 'idle_latency_ms'],
+    ['Idle loss (%)', 'idle_loss_pct'], ['Latency under load (+ms)', 'loaded_download_bloat_ms'], ['Loss under load (%)', 'loaded_download_loss_pct'],
+    ['Service failures (%)', 'service_fail_pct'], ['Cloud handshake (ms)', 'cloud_connect_ms'], ['Best DNS (ms)', 'dns_best_ms'],
+    ['SSH download', 'ssh_download_mbps'], ['SSH upload', 'ssh_upload_mbps'],
+  ];
+  const key = t => `${t.target.id}|${t.streams}`;
+  const rows = [];
+  for (const dir of ['download', 'upload']) {
+    const ma = Object.fromEntries((a[dir] || []).filter(t => t.result).map(t => [key(t), t]));
+    const mb = Object.fromEntries((b[dir] || []).filter(t => t.result).map(t => [key(t), t]));
+    for (const k of [...new Set([...Object.keys(ma), ...Object.keys(mb)])]) {
+      const t = ma[k] || mb[k];
+      rows.push([dir, t.target.name, t.streams, ma[k]?.result.steady_mbps, mb[k]?.result.steady_mbps]);
+    }
+  }
+  $('detail').classList.remove('hidden');
+  $('detail').innerHTML = `
+    <div class="panel-head"><h2>Compare<small>A: ${name(a)} &nbsp; B: ${name(b)}</small></h2></div>
+    <h3>Headline</h3><div class="table-wrap"><table><thead><tr><th>Metric</th><th class="num">A</th><th class="num">B</th><th class="num">Change</th></tr></thead><tbody>
+    ${metrics.map(([l, k]) => `<tr><td>${l}</td><td class="num">${fmt(a.summary[k])}</td><td class="num">${fmt(b.summary[k])}</td>${deltaCell(a.summary[k], b.summary[k])}</tr>`).join('')}
+    </tbody></table></div>
+    <h3>Per target (steady Mbps)</h3><div class="table-wrap"><table><thead><tr><th>Target</th><th class="num">Conn</th><th class="num">A</th><th class="num">B</th><th class="num">Change</th></tr></thead><tbody>
+    ${rows.map(r => `<tr><td>${esc(r[1])}<span class="sub">${r[0]}</span></td><td class="num">${r[2]}</td><td class="num">${fmt(r[3])}</td><td class="num">${fmt(r[4])}</td>${deltaCell(r[3], r[4])}</tr>`).join('')}
+    </tbody></table></div>
+    <h3>Findings</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0 22px;">
+      ${[a, b].map((r, i) => `<div><p class="muted" style="margin: 0 0 4px;">${i ? 'B' : 'A'}: ${name(r)}</p>${(r.findings || []).filter(f => f.severity !== 'ok').map(f => findingHtml(f, false)).join('') || '<p class="empty">No issues.</p>'}</div>`).join('')}
+    </div>`;
+}
+
+/* ---------- redraw charts at the new width ---------- */
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    renderTrend();
+    if (VIEW && VIEW.kind === 'run') renderRun(VIEW.doc);
+  }, 200);
+});
+
+(async () => {
+  $('theme-btn').textContent = currentTheme() === 'light' ? 'Dark' : 'Light';
+  try { await loadConfig(); await loadRuns(); } catch (e) { showError(e.message); }
+  pollProgress();
+})();
+</script>
+</body>
+</html>

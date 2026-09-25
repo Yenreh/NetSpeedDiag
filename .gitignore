@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+data/
+logs/
+.vscode/
+.idea/
+config/tests.local.json
+.claude/settings.local.json

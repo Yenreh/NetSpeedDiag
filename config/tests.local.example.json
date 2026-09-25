@@ -1,0 +1,43 @@
+{
+  "_comment": "Copy to config/tests.local.json (not versioned). Entries merge into config/tests.json by id: same id overrides, new id is added.",
+  "services": {
+    "checks": [
+      {
+        "id": "droplet-ssh",
+        "type": "ssh",
+        "name": "My droplet (SSH)",
+        "host": "203.0.113.10",
+        "user": "root",
+        "port": 22,
+        "identity_file": "~/.ssh/id_ed25519",
+        "auth": true,
+        "throughput_mb": 50,
+        "category": "cloud"
+      },
+      {
+        "id": "droplet-https",
+        "type": "https",
+        "name": "My droplet (HTTPS)",
+        "host": "app.example.com",
+        "category": "cloud"
+      },
+      {
+        "id": "db-tcp",
+        "type": "tcp",
+        "name": "Database port",
+        "host": "203.0.113.10",
+        "port": 5432,
+        "category": "cloud"
+      }
+    ]
+  },
+  "route": {
+    "targets": [
+      "8.8.8.8",
+      "speed.cloudflare.com",
+      "proof.ovh.net",
+      "nyc3.digitaloceanspaces.com",
+      "203.0.113.10"
+    ]
+  }
+}
