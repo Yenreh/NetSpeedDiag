@@ -16,7 +16,7 @@ and a CLI sit on top.
 ## Setup
 
 ```bash
-python3.13 -m venv .venv
+python3.13 -m venv --system-site-packages .venv       # python3-gi for the app window
 .venv/bin/pip install -r requirements.txt
 cp .env.template .env                                  # plan speeds, port, paths
 cp config/tests.local.example.json config/tests.local.json   # optional, private hosts
@@ -38,6 +38,7 @@ Logs go to stderr, so stdout of `--json` / `--brief` is clean JSON.
 .venv/bin/python main.py repeat -e 15 [-c 8] -l monitor                 # runs every 15 min
 .venv/bin/python main.py reanalyze [RUN_ID ...]                         # after changing thresholds / plan
 .venv/bin/python main.py serve                                          # dashboard, http://127.0.0.1:7072/
+.venv/bin/python main.py app                                            # native window; server stops on close
 .venv/bin/python -m unittest discover -s tests
 ```
 

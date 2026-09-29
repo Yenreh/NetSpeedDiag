@@ -8,7 +8,7 @@ compared, for example before and after connecting directly to the ISP modem.
 ## Setup
 
 ```bash
-python3.13 -m venv .venv
+python3.13 -m venv --system-site-packages .venv   # system GTK bindings for the app window
 .venv/bin/pip install -r requirements.txt
 cp .env.template .env        # set NSD_PLAN_DOWNLOAD_MBPS / NSD_PLAN_UPLOAD_MBPS
 ```
@@ -20,6 +20,7 @@ No root needed.
 
 ```bash
 .venv/bin/python main.py                    # dashboard at http://127.0.0.1:7072/
+.venv/bin/python main.py app                # dashboard in a native window, stops when closed
 .venv/bin/python main.py run -p quick -l via-router -n "evening"
 .venv/bin/python main.py repeat -e 30 -c 24 -l day-profile   # quick run every 30 min, 12 h
 .venv/bin/python main.py list [-n 10] [--json]
@@ -32,6 +33,26 @@ No root needed.
 Profiles (`config/tests.json`): `quick` (~2 min), `standard` (~6 min), `full` (~10 min,
 adds 8 streams). Only one run executes at a time, also across processes (dashboard and
 terminal share a lock file).
+
+## Desktop launcher
+
+`main.py app` opens the dashboard in a native window (pywebview, GTK/WebKit) and stops the
+server when the window closes. Closing during a test asks for confirmation and cancels the run
+(its partial results are saved). It needs `sudo apt install python3-gi gir1.2-webkit2-4.1` and
+a venv created with `--system-site-packages`. Example
+`~/.local/share/applications/netspeeddiag.desktop`:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=NetSpeedDiag
+Exec=/path/to/NetSpeedDiag/.venv/bin/python /path/to/NetSpeedDiag/main.py app
+Path=/path/to/NetSpeedDiag
+Icon=/path/to/NetSpeedDiag/netspeeddiag/static/icon128.png
+Terminal=false
+Categories=Network;
+StartupWMClass=netspeeddiag
+```
 
 ## What is measured
 

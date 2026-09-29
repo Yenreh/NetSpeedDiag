@@ -2,6 +2,7 @@
 NetSpeedDiag command line.
 
     python main.py serve                       dashboard on NSD_HOST:NSD_PORT (default)
+    python main.py app                         dashboard in a native window; the server stops when it closes
     python main.py run [-p PROFILE] [-l LABEL] [-n NOTES]
     python main.py repeat -e MIN [-c N] [-p PROFILE] [-l LABEL]
                                                runs spaced over time (peak-hour degradation)
@@ -176,6 +177,76 @@ def compare_runs(a: dict, b: dict) -> dict:
     }
 
 
+APP_CANCEL_WAIT_S = 60
+"""How long a closed app window waits for a cancelled run to save its document."""
+
+
+def _port_free(host: str, port: int) -> bool:
+    """
+    Tell whether a TCP port can be bound (werkzeug exits instead of raising).
+
+    Args:
+        host: Bind address.
+        port: Port to test.
+
+    Returns:
+        ``True`` when the port is free.
+    """
+    import socket
+
+    with socket.socket() as sock:
+        try:
+            sock.bind((host, port))
+        except OSError:
+            return False
+    return True
+
+
+def open_app_window(settings, store: ResultStore, runner: DiagnosticRunner) -> None:
+    """
+    Serve the dashboard for a native window and stop when the window closes.
+
+    The server binds ``NSD_PORT`` (a free port when that one is taken, e.g. by
+    a running ``serve``). Closing during a run asks for confirmation; a
+    confirmed close cancels the run and waits for it to save before exiting.
+
+    Args:
+        settings: Application settings.
+        store: Result store.
+        runner: Diagnostic runner.
+    """
+    import threading
+
+    import webview
+    from werkzeug.serving import make_server
+
+    from netspeeddiag.settings import PROJECT_ROOT, VERSION
+    from netspeeddiag.web import create_app
+
+    from gi.repository import GLib
+
+    GLib.set_prgname("netspeeddiag")  # window app id: matches netspeeddiag.desktop in the dock
+
+    port = settings.port if _port_free(settings.host, settings.port) else 0
+    server = make_server(settings.host, port, create_app(settings, store, runner), threaded=True)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    window = webview.create_window(f"NetSpeedDiag {VERSION}", f"http://{settings.host}:{server.server_port}/",
+                                   width=1360, height=940, min_size=(390, 500))
+
+    def on_closing():
+        window.confirm_close = bool(runner.progress().get("running"))
+
+    window.events.closing += on_closing
+    webview.start(gui="gtk", private_mode=False, storage_path=str(settings.results_dir.parent / "webview"),
+                  icon=str(PROJECT_ROOT / "netspeeddiag" / "static" / "icon128.png"),
+                  localization={"global.quitConfirmation": "A test is running. Close and cancel it?"})
+    if runner.cancel():
+        deadline = time.monotonic() + APP_CANCEL_WAIT_S
+        while runner.progress().get("running") and time.monotonic() < deadline:
+            time.sleep(0.5)
+    server.shutdown()
+
+
 def main() -> int:
     """
     Parse the command line and dispatch.
@@ -187,6 +258,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Home internet line diagnostics")
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("serve", help="run the web dashboard (default)")
+    sub.add_parser("app", help="dashboard in a native window; stops when closed")
     run_p = sub.add_parser("run", help="execute a diagnostic run from the terminal")
     run_p.add_argument("-p", "--profile", default=settings.default_profile,
                        help=f"test profile ({', '.join(settings.profile_names())})")
@@ -222,6 +294,9 @@ def main() -> int:
         from netspeeddiag.web import create_app
         print(f"Dashboard: http://{settings.host}:{settings.port}/", flush=True)
         create_app(settings, store, runner).run(host=settings.host, port=settings.port, threaded=True)
+        return 0
+    if args.command == "app":
+        open_app_window(settings, store, runner)
         return 0
     if args.command == "run":
         try:
