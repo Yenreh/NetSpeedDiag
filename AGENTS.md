@@ -37,7 +37,7 @@ Logs go to stderr, so stdout of `--json` / `--brief` is clean JSON.
 .venv/bin/python main.py compare previous latest [--json]               # A = baseline
 .venv/bin/python main.py repeat -e 15 [-c 8] -l monitor                 # runs every 15 min
 .venv/bin/python main.py reanalyze [RUN_ID ...]                         # after changing thresholds / plan
-.venv/bin/python main.py serve                                          # dashboard, http://127.0.0.1:7071/
+.venv/bin/python main.py serve                                          # dashboard, http://127.0.0.1:7072/
 .venv/bin/python -m unittest discover -s tests
 ```
 

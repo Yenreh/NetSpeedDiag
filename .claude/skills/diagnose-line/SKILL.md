@@ -12,7 +12,7 @@ Work from the repository root. Use `.venv/bin/python` (Python 3.13). Read `AGENT
 
 ```bash
 .venv/bin/python main.py list -n 5
-curl -s localhost:7071/api/progress 2>/dev/null   # a dashboard run in progress blocks new runs
+curl -s localhost:7072/api/progress 2>/dev/null   # a dashboard run in progress blocks new runs
 ```
 
 If the venv is missing: `python3.13 -m venv .venv && .venv/bin/pip install -r requirements.txt`.
@@ -28,7 +28,7 @@ Pick the profile by purpose:
 | Intermittent problem | `.venv/bin/python main.py repeat -e 15 -c <n> -l monitor` (run in background) |
 
 If the dashboard is serving and the user watches it, start through the API instead so the
-run appears live: `curl -s -X POST localhost:7071/api/runs -H 'Content-Type: application/json'
+run appears live: `curl -s -X POST localhost:7072/api/runs -H 'Content-Type: application/json'
 -d '{"profile":"quick","label":"<label>","notes":"<notes>"}'`, then poll `/api/progress`
 until `running` is false and read it with `show latest`.
 

@@ -19,7 +19,7 @@ No root needed.
 ## Usage
 
 ```bash
-.venv/bin/python main.py                    # dashboard at http://127.0.0.1:7071/
+.venv/bin/python main.py                    # dashboard at http://127.0.0.1:7072/
 .venv/bin/python main.py run -p quick -l via-router -n "evening"
 .venv/bin/python main.py repeat -e 30 -c 24 -l day-profile   # quick run every 30 min, 12 h
 .venv/bin/python main.py list [-n 10] [--json]

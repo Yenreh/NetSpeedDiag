@@ -185,7 +185,7 @@ def load_settings() -> Settings:
     env = os.environ.get
     return Settings(
         host=env("NSD_HOST", "127.0.0.1"),
-        port=int(env("NSD_PORT", "7071")),
+        port=int(env("NSD_PORT", "7072")),
         plan_download_mbps=float(env("NSD_PLAN_DOWNLOAD_MBPS", "0") or 0),
         plan_upload_mbps=float(env("NSD_PLAN_UPLOAD_MBPS", "0") or 0),
         default_profile=env("NSD_DEFAULT_PROFILE", "standard"),
